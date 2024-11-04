@@ -1,0 +1,17 @@
+---
+version: '3'
+services:
+  kafka:
+    extends:
+      file: docker-compose.kafka.yml
+      service: kafka
+  control-center:
+    extends:
+      file: docker-compose.kafka.yml
+      service: control-center
+
+
+networks:
+  default:
+    enable_ipv6: false
+
