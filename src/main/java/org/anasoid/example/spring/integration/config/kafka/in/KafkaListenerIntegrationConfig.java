@@ -15,7 +15,10 @@ import org.springframework.integration.kafka.support.RawRecordHeaderErrorMessage
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHandler;
+import org.springframework.messaging.MessagingException;
 import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Map;
@@ -52,7 +55,7 @@ public class KafkaListenerIntegrationConfig {
                 .from(Kafka.messageDrivenChannelAdapter(consumerFactory(),
                                 KafkaMessageDrivenChannelAdapter.ListenerMode.record, TOPIC)
                         .configureListenerContainer(c ->
-                                c.ackMode(ContainerProperties.AckMode.MANUAL)
+                                c.ackMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE)
                                         .id("topic1ListenerContainer"))
                         .recoveryCallback(new ErrorMessageSendingRecoverer(errorChannel(),
                                 new RawRecordHeaderErrorMessageStrategy()))
@@ -65,8 +68,27 @@ public class KafkaListenerIntegrationConfig {
     @Bean
     public IntegrationFlow myFlowResult() {
         return IntegrationFlow.from("listeningFromKafkaResults1")
-                .handle(m -> System.out.println("Reception : " + m))
+                .handle(new BasicMessageHandler())
                 .get();
+    }
+
+    @Bean
+    public IntegrationFlow myFlowError() {
+        return IntegrationFlow.from("errorChannel")
+                .handle(message-> System.out.println("!!!! ERROR : " + message))
+                .get();
+    }
+
+    class BasicMessageHandler implements MessageHandler{
+        @Override
+        public void handleMessage(Message<?> message) throws MessagingException {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("---- Reception : " + message);
+        }
     }
 
     @Bean

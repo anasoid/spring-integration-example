@@ -21,6 +21,7 @@ import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.support.GenericMessage;
 
 import java.util.Map;
+import java.util.UUID;
 
 
 /*
@@ -43,26 +44,20 @@ import java.util.Map;
 @Configuration
 public class KafkaSenderIntegrationConfig {
 
+
     public final static String TOPIC = "SPR_TOPIC";
     @Autowired
     KafkaProperties kafkaProperties;
 
-    @Bean
-    public ProducerFactory<java.lang.Object, java.lang.Object> producerFactory() {
-        Map<String, Object> producerProperties = kafkaProperties.buildProducerProperties(null);
-        producerProperties.put(ProducerConfig.LINGER_MS_CONFIG, 1);
-        return new DefaultKafkaProducerFactory<>(producerProperties);
-    }
 
     @Bean
     public IntegrationFlow myFlow(MessageHandler toKafka) {
         return IntegrationFlow.from("sequencePollChanel")
                 .publishSubscribeChannel(s -> s
                         .applySequence(true)
-                        .subscribe(f -> f
-                                .handle(toKafka))
-                        .subscribe(f -> f.
-                                handle(m -> System.out.println("Send   : " + m)))
+                        .subscribe(f -> f.handle(m -> System.out.println("++++....Send   : " + m)))
+                        .subscribe(f -> f.handle(toKafka))
+                        .subscribe(f -> f.handle(m -> System.out.println("++++Send   : " + m)))
                 )
                 .get();
     }
@@ -86,15 +81,23 @@ public class KafkaSenderIntegrationConfig {
     @Bean
     @InboundChannelAdapter(value = "sequencePollChanel", poller = @Poller(fixedDelay = "1000"))
     public MessageSource<String> sequenceMessageSource() {
+        final long executionID = UUID.randomUUID().getMostSignificantBits();
         MessageSource<String> sourceReader = new MessageSource<>() {
             int i = -1;
 
             @Override
             public Message<String> receive() {
                 i++;
-                return new GenericMessage<>("m" + i + ",n" + i + ",o" + i);
+                return new GenericMessage<>("e" + Math.abs(executionID) % 100000 + ",m" + i + ",n" + i + ",o" + i);
             }
         };
         return sourceReader;
+    }
+
+    @Bean
+    public ProducerFactory<java.lang.Object, java.lang.Object> producerFactory() {
+        Map<String, Object> producerProperties = kafkaProperties.buildProducerProperties(null);
+        producerProperties.put(ProducerConfig.LINGER_MS_CONFIG, 1);
+        return new DefaultKafkaProducerFactory<>(producerProperties);
     }
 }

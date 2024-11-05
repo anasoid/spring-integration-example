@@ -7,7 +7,7 @@ spring:
     name: spring-integration-example
   kafka:
     consumer:
-      group-id: siTestGroup
+      group-id: spr-integration
       auto-offset-reset: earliest
       enable-auto-commit: false
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
