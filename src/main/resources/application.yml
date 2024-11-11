@@ -18,3 +18,9 @@ spring:
       retries: 0
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+  task:
+    scheduling:
+      thread-name-prefix: schedulingg-
+      pool:
+        size: '2'

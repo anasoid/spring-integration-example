@@ -1,11 +1,20 @@
 package org.anasoid.example.spring.integration.config.kafka.in;
 
+
 import org.anasoid.example.spring.integration.config.kafka.out.KafkaSenderIntegrationConfig;
+import org.anasoid.example.spring.integration.handler.BasicMessageHandler;
+import org.anasoid.example.spring.integration.handler.BasicSplitMessageHandler;
+import org.anasoid.example.spring.integration.handler.ErrorMessageHandler;
+import org.anasoid.example.spring.integration.splitter.BasicMessageSplitter;
+import org.anasoid.example.spring.integration.transformer.TransformerMessageFromString;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
@@ -15,10 +24,7 @@ import org.springframework.integration.kafka.support.RawRecordHeaderErrorMessage
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHandler;
-import org.springframework.messaging.MessagingException;
 import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Map;
@@ -43,14 +49,15 @@ import java.util.Map;
  */
 @Configuration
 public class KafkaListenerIntegrationConfig {
-
+    public final static Logger LOG = LoggerFactory.getLogger(KafkaListenerIntegrationConfig.class);
     public final static String TOPIC = KafkaSenderIntegrationConfig.TOPIC;
+
 
     @Autowired
     KafkaProperties kafkaProperties;
 
     @Bean
-    public IntegrationFlow topic1ListenerFromKafkaFlow() {
+    public IntegrationFlow topicListenerFromKafkaFlow() {
         return IntegrationFlow
                 .from(Kafka.messageDrivenChannelAdapter(consumerFactory(),
                                 KafkaMessageDrivenChannelAdapter.ListenerMode.record, TOPIC)
@@ -59,41 +66,50 @@ public class KafkaListenerIntegrationConfig {
                                         .id("topic1ListenerContainer"))
                         .recoveryCallback(new ErrorMessageSendingRecoverer(errorChannel(),
                                 new RawRecordHeaderErrorMessageStrategy()))
-                        .retryTemplate(new RetryTemplate())
+                        .retryTemplate(RetryTemplate.builder().build())
                         .filterInRetry(true))
-                .channel(c -> c.queue("listeningFromKafkaResults1"))
+                .channel(c -> c.direct("listeningFromKafkaResults1"))
                 .get();
     }
 
     @Bean
-    public IntegrationFlow myFlowResult() {
+    public IntegrationFlow fromKafka() {
         return IntegrationFlow.from("listeningFromKafkaResults1")
-                .handle(new BasicMessageHandler())
+                .transform(new TransformerMessageFromString())
+                .publishSubscribeChannel(s -> s
+                        .applySequence(true)
+                        .subscribe(f -> f.handle(new BasicMessageHandler()))
+                        .subscribe(f -> f.channel(importChannel()))
+                        //.subscribe(f -> f.handle(m -> LOG.info("+++++ToImport   : " + m)))
+                )
+                .get();
+    }
+
+
+
+    @Bean
+    public IntegrationFlow flowImport() {
+        return IntegrationFlow.from(importChannel())
+                .split(new BasicMessageSplitter())
+                .handle(new BasicSplitMessageHandler())
                 .get();
     }
 
     @Bean
     public IntegrationFlow myFlowError() {
-        return IntegrationFlow.from("errorChannel")
-                .handle(message-> System.out.println("!!!! ERROR : " + message))
+        return IntegrationFlow.from(errorChannel())
+                .handle(new ErrorMessageHandler())
                 .get();
     }
 
-    class BasicMessageHandler implements MessageHandler{
-        @Override
-        public void handleMessage(Message<?> message) throws MessagingException {
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            System.out.println("---- Reception : " + message);
-        }
+    @Bean
+    public MessageChannel importChannel() {
+        return new QueueChannel();
     }
 
     @Bean
     public MessageChannel errorChannel() {
-        return new QueueChannel();
+        return new DirectChannel();
     }
 
     @Bean
@@ -102,5 +118,6 @@ public class KafkaListenerIntegrationConfig {
         consumerProperties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 15000);
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
+
 
 }

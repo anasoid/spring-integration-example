@@ -1,6 +1,8 @@
 package org.anasoid.example.spring.integration.config.kafka.out;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
@@ -44,7 +46,7 @@ import java.util.UUID;
 @Configuration
 public class KafkaSenderIntegrationConfig {
 
-
+    public final static Logger LOG = LoggerFactory.getLogger(KafkaSenderIntegrationConfig.class);
     public final static String TOPIC = "SPR_TOPIC";
     @Autowired
     KafkaProperties kafkaProperties;
@@ -55,9 +57,8 @@ public class KafkaSenderIntegrationConfig {
         return IntegrationFlow.from("sequencePollChanel")
                 .publishSubscribeChannel(s -> s
                         .applySequence(true)
-                        .subscribe(f -> f.handle(m -> System.out.println("++++....Send   : " + m)))
                         .subscribe(f -> f.handle(toKafka))
-                        .subscribe(f -> f.handle(m -> System.out.println("++++Send   : " + m)))
+                        .subscribe(f -> f.handle(m -> LOG.info("+++++Send   : " + m)))
                 )
                 .get();
     }
@@ -79,7 +80,7 @@ public class KafkaSenderIntegrationConfig {
     }
 
     @Bean
-    @InboundChannelAdapter(value = "sequencePollChanel", poller = @Poller(fixedDelay = "1000"))
+    @InboundChannelAdapter(value = "sequencePollChanel", poller = @Poller(fixedRate = "5000"))
     public MessageSource<String> sequenceMessageSource() {
         final long executionID = UUID.randomUUID().getMostSignificantBits();
         MessageSource<String> sourceReader = new MessageSource<>() {
@@ -88,7 +89,7 @@ public class KafkaSenderIntegrationConfig {
             @Override
             public Message<String> receive() {
                 i++;
-                return new GenericMessage<>("e" + Math.abs(executionID) % 100000 + ",m" + i + ",n" + i + ",o" + i);
+                return new GenericMessage<>("e" + Math.abs(executionID) % 10000 + ",m" + i + ",n" + i + ",o" + i);
             }
         };
         return sourceReader;
