@@ -4,12 +4,12 @@ kafka:
   messageKey: si.key
 spring:
   application:
-    name: spring-integration-example
+    name: spri
   kafka:
     consumer:
       group-id: spr-integration
       auto-offset-reset: earliest
-      enable-auto-commit: false
+      enable-auto-commit: true
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:

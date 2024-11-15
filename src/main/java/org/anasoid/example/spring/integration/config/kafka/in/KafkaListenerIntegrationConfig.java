@@ -5,6 +5,7 @@ import org.anasoid.example.spring.integration.config.kafka.out.KafkaSenderIntegr
 import org.anasoid.example.spring.integration.handler.BasicMessageHandler;
 import org.anasoid.example.spring.integration.handler.BasicSplitMessageHandler;
 import org.anasoid.example.spring.integration.handler.ErrorMessageHandler;
+import org.anasoid.example.spring.integration.interceptor.LogChannelInterceptor;
 import org.anasoid.example.spring.integration.splitter.BasicMessageSplitter;
 import org.anasoid.example.spring.integration.transformer.TransformerMessageFromString;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -25,7 +26,6 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Map;
 
@@ -60,38 +60,52 @@ public class KafkaListenerIntegrationConfig {
     public IntegrationFlow topicListenerFromKafkaFlow() {
         return IntegrationFlow
                 .from(Kafka.messageDrivenChannelAdapter(consumerFactory(),
-                                KafkaMessageDrivenChannelAdapter.ListenerMode.record, TOPIC)
-                        .configureListenerContainer(c ->
-                                c.ackMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE)
-                                        .id("topic1ListenerContainer"))
-                        .recoveryCallback(new ErrorMessageSendingRecoverer(errorChannel(),
-                                new RawRecordHeaderErrorMessageStrategy()))
-                        .retryTemplate(RetryTemplate.builder().build())
-                        .filterInRetry(true))
-                .channel(c -> c.direct("listeningFromKafkaResults1"))
+                                        KafkaMessageDrivenChannelAdapter.ListenerMode.record, TOPIC)
+                                .configureListenerContainer(c ->
+                                        c.ackMode(ContainerProperties.AckMode.COUNT)
+                                                .id("topic1ListenerContainer"))
+                                .recoveryCallback(new ErrorMessageSendingRecoverer(errorChannel(),
+                                        new RawRecordHeaderErrorMessageStrategy()))
+                        //.retryTemplate(RetryTemplate.builder().build())
+                        //.filterInRetry(true)
+                )
+                .channel(c -> c.queue("listeningFromKafkaResults1"))
                 .get();
     }
 
     @Bean
     public IntegrationFlow fromKafka() {
         return IntegrationFlow.from("listeningFromKafkaResults1")
+                .intercept(logChannelInterceptor())
                 .transform(new TransformerMessageFromString())
                 .publishSubscribeChannel(s -> s
-                        .applySequence(true)
-                        .subscribe(f -> f.handle(new BasicMessageHandler()))
-                        .subscribe(f -> f.channel(importChannel()))
+                                .applySequence(true)
+                                .subscribe(f -> f.handle(new BasicMessageHandler()))
+                                .subscribe(f -> f.channel(importChannel()))
+                                .subscribe(f -> f.channel(successChannel()))
                         //.subscribe(f -> f.handle(m -> LOG.info("+++++ToImport   : " + m)))
                 )
                 .get();
     }
 
 
-
     @Bean
     public IntegrationFlow flowImport() {
         return IntegrationFlow.from(importChannel())
                 .split(new BasicMessageSplitter())
-                .handle(new BasicSplitMessageHandler())
+                .channel(splittedChannel())
+                .get();
+    }
+
+    @Bean
+    public IntegrationFlow flowSplittedImport() {
+        return IntegrationFlow.from(splittedChannel())
+                .publishSubscribeChannel(s -> s
+                                .applySequence(true)
+                                .subscribe(f -> f.handle(new BasicSplitMessageHandler()))
+                                .subscribe(f -> f.channel(successChannel()))
+                        //.subscribe(f -> f.handle(m -> LOG.info("+++++ToImport   : " + m)))
+                )
                 .get();
     }
 
@@ -100,6 +114,23 @@ public class KafkaListenerIntegrationConfig {
         return IntegrationFlow.from(errorChannel())
                 .handle(new ErrorMessageHandler())
                 .get();
+    }
+
+    @Bean
+    public IntegrationFlow myFlowSuccess() {
+        return IntegrationFlow.from(successChannel())
+                .handle(m -> LOG.info("************Success   : " + m))
+                .get();
+    }
+
+    @Bean
+    public MessageChannel successChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean
+    public MessageChannel splittedChannel() {
+        return new DirectChannel();
     }
 
     @Bean
@@ -119,5 +150,8 @@ public class KafkaListenerIntegrationConfig {
         return new DefaultKafkaConsumerFactory<>(consumerProperties);
     }
 
+    public LogChannelInterceptor logChannelInterceptor() {
+        return new LogChannelInterceptor();
+    }
 
 }

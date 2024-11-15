@@ -58,7 +58,7 @@ public class KafkaSenderIntegrationConfig {
                 .publishSubscribeChannel(s -> s
                         .applySequence(true)
                         .subscribe(f -> f.handle(toKafka))
-                        .subscribe(f -> f.handle(m -> LOG.info("+++++Send   : " + m)))
+                        //.subscribe(f -> f.handle(m -> LOG.info("+++++Send   : " + m)))
                 )
                 .get();
     }
@@ -80,7 +80,7 @@ public class KafkaSenderIntegrationConfig {
     }
 
     @Bean
-    @InboundChannelAdapter(value = "sequencePollChanel", poller = @Poller(fixedRate = "5000"))
+    @InboundChannelAdapter(value = "sequencePollChanel", poller = @Poller(fixedRate = "15000"))
     public MessageSource<String> sequenceMessageSource() {
         final long executionID = UUID.randomUUID().getMostSignificantBits();
         MessageSource<String> sourceReader = new MessageSource<>() {

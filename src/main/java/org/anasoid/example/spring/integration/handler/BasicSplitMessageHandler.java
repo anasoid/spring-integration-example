@@ -18,10 +18,9 @@ package org.anasoid.example.spring.integration.handler;
  * Date :   11/6/24
  */
 
+import org.anasoid.example.spring.integration.dto.MessagePayloadDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
@@ -29,13 +28,17 @@ import org.springframework.messaging.MessagingException;
 public class BasicSplitMessageHandler implements MessageHandler {
 
     public final static Logger LOG = LoggerFactory.getLogger(BasicSplitMessageHandler.class);
+
     @Override
     public void handleMessage(Message<?> message) throws MessagingException {
-
+        Message<MessagePayloadDto> messageDto = (Message<MessagePayloadDto>) message;
 
         //LOG.info("----Reception : START : " + message);
+        if (messageDto.getPayload().getSubMessage().get("m") != null) {
+          //  throw new RuntimeException("unsupported message m");
+        }
         try {
-            Thread.sleep(2);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

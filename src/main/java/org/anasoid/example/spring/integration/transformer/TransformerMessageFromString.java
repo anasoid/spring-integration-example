@@ -35,7 +35,7 @@ public class TransformerMessageFromString implements GenericTransformer<Message<
     public Message<MessagePayloadDto> transform(Message<String> source) {
         String regex = "^e(\\d+),m(\\d+),n(\\d+),o(\\d+)$";
         String line = source.getPayload();
-        LOG.warn("----IN : " + source);
+        //LOG.warn("----IN : " + source);
         Pattern p = Pattern.compile(regex);
         Matcher matcher = p.matcher(line);
         if (matcher.find()) {
@@ -43,18 +43,16 @@ public class TransformerMessageFromString implements GenericTransformer<Message<
             Integer code = Integer.valueOf(matcher.group(2));
             int modulo = 3;
             long current = System.currentTimeMillis() % 10000;
-            int deliveryAttempt = Integer.valueOf(source.getHeaders().get("deliveryAttempt").toString());
-            if (current % modulo == code % modulo) {
-                LOG.warn("----RETRY :(" + current + "," + code + "): " + source);
-                throw new RetryException("Retry (" + current + "," + code + ")");
-            }
-            if (deliveryAttempt > 0) {
-                LOG.info("----RETRYING Success(" + deliveryAttempt + "):(" + current + "," + code + "): " + source);
-            }
+
             MessagePayloadDto result = new MessagePayloadDto(executionId, code);
             result.getSubMessage().put("m", Integer.valueOf(matcher.group(2)));
             result.getSubMessage().put("n", Integer.valueOf(matcher.group(3)));
             result.getSubMessage().put("o", Integer.valueOf(matcher.group(4)));
+
+            int count = Integer.valueOf(matcher.group(2));
+            if (count == 1) {
+                //throw new RuntimeException("Invalid Message count");
+            }
             return new GenericMessage<>(result, source.getHeaders());
 
         } else {

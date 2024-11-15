@@ -65,6 +65,11 @@ public class BasicMessageSplitter extends AbstractMessageSplitter {
             Map<String,Object> messageHeaders = copyMessageHeaders(originMessage.getHeaders(), null);
 
             messageHeaders.put("SPLITTER", true);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             return new GenericMessage<>(payloadDto, messageHeaders);
         }
 
