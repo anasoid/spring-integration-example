@@ -4,7 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.integration.config.EnableIntegration;
 
-@SpringBootApplication(scanBasePackages = {"org.anasoid.example.spring.integration.config.kafka.out"})
+@SpringBootApplication(scanBasePackages = {"org.anasoid.example.spring.integration.config.kafka.in"})
 @EnableIntegration
 public class KafkaFlowReceptSpringIntegrationExampleApplication {
 
